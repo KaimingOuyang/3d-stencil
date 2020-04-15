@@ -95,7 +95,7 @@ void parse_params(int argc, char *argv[], int rank, int nprocs, int *px, int *py
 	*lnx = ((*lx) + 1) * (*nx) / (*px) - (*lx) * (*nx) / (*px);
 	*lny = ((*ly) + 1) * (*ny) / (*py) - (*ly) * (*ny) / (*py);
 	*lnz = ((*lz) + 1) * (*nz) / (*pz) - (*lz) * (*nz) / (*pz);
-	int total_elem = (*lnx) * (*lny) * (*lnz);
+	int total_elem = (*lnx) * (*lny) * (*lnz) * (*nvar);
 	if(total_elem >= MAX_LOCAL_ELEMENTS){
 		printf("rank %d - total_elem %d is too large (>= %d)\n", rank, total_elem, MAX_LOCAL_ELEMENTS);
 		exit(1);
@@ -249,8 +249,23 @@ void halo_exchange(int bnx, int bny, int bnz, int neighbors[], MPI_Datatype back
 	return;
 }
 
-void stencil(double *work_buf, double *dest_buf, int lnx, int lny, int lnz){
 
+#define SEVEN_POINTS 7.0
+void stencil(double *work_buf, double *dest_buf, int bnx, int bny, int bnz){
+	int i, j, k;
+	for (k = 1; k < bnz - 1; ++k)
+		for (j = 1; j < bny - 1; ++j)
+			for (i = 1; i < bnx - 1; ++i) {
+				int origin = i + bnx * j + bnx * bny * k;
+				int back_pos = i + bnx * j + bnx * bny * (k - 1);
+				int front_pos = i + bnx * j + bnx * bny * (k + 1);
+				int east_pos = i - 1 + bnx * j  + bnx * bny * k;
+				int west_pos = i + 1 + bnx * j + bnx * bny * k;
+				int north_pos = i + bnx * (j - 1) + bnx * bny * k;
+				int south_pos = i + bnx * (j + 1) + bnx * bny * k;
+				dest_buf[origin] = (work_buf[origin] + work_buf[back_pos] + work_buf[front_pos] + work_buf[east_pos] + work_buf[west_pos] + work_buf[north_pos] + work_buf[south_pos]) / SEVEN_POINTS;
+			}
+	return;
 }	
 
 int main(int argc, char *argv[]){
@@ -289,19 +304,31 @@ int main(int argc, char *argv[]){
 	// printf("rank %d - end init buf\n", rank);
 	// fflush(stdout);
 	/* begin 3d 7 point stencil */
+	MPI_Barrier(MPI_COMM_WORLD);
+	double time = MPI_Wtime();
 	for(i=0;i<iteration;++i){
 		/* exchange boundary */
+		// if(rank == 0){
+		// 	printf("ITERATION - %d\n", i);
+		// 	fflush(stdout);
+		// }
 		// printf("rank %d - begin exchange\n", rank);
 		// fflush(stdout);
 		halo_exchange(bnx, bny, bnz, neighbors, backfront, eastwest, northsouth, dat_buf[working_buf]);
 		// printf("rank %d - end exchange\n", rank);
 		// fflush(stdout);
 		/* compute */
-		// 3d_7point_stencil(dat_buf[working_buf], dat_buf[working_buf ^ 1]);
+		stencil(dat_buf[working_buf], dat_buf[working_buf ^ 1], bnx, bny, bnz);
 
 		working_buf ^= 1;
 	}
-	
+	MPI_Barrier(MPI_COMM_WORLD);
+
+	time = MPI_Wtime() - time;
+	if(rank == 0){
+		printf("%d %.3lf\n", nprocs, time);
+		fflush(stdout);
+	}
 
 	free_3dstencil_dt(backfront, eastwest, northsouth);
 	MPI_Finalize();
