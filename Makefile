@@ -2,9 +2,13 @@ DEBUG=0
 CC=mpicc
 CFLAGS=-g -Wall
 ifeq ($(DEBUG), 0)
-	CFLAGS+=-O2
+	CFLAGS+= -O2
 else
-	CFLAGS+=-O
+	CFLAGS+= -O
+endif
+
+ifeq ($(CC), ampicc)
+	CFLAGS += -balancer GreedyRefineLB -DAMPI_LOAD_BALANCE
 endif
 
 FILES=3d-stencil.c

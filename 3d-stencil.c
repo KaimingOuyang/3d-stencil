@@ -320,6 +320,13 @@ int main(int argc, char *argv[]){
 		/* compute */
 		stencil(dat_buf[working_buf], dat_buf[working_buf ^ 1], bnx, bny, bnz);
 
+#ifdef AMPI_LOAD_BALANCE
+		const int steps = 5;
+		if(iter % steps == 0){
+			AMPI_Migrate(AMPI_INFO_LB_SYNC);
+		}
+#endif
+		
 		working_buf ^= 1;
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
