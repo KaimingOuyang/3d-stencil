@@ -311,6 +311,10 @@ int main(int argc, char *argv[]){
 	// printf("rank %d - end init buf\n", rank);
 	// fflush(stdout);
 	/* begin 3d 7 point stencil */
+
+#ifdef AMPI_LOAD_BALANCE
+		AMPI_Migrate(AMPI_INFO_LB_SYNC);
+#endif
 	MPI_Barrier(MPI_COMM_WORLD);
 	double time = MPI_Wtime();
 	for(i=0;i<iteration;++i){
@@ -328,7 +332,7 @@ int main(int argc, char *argv[]){
 		stencil(dat_buf[working_buf], dat_buf[working_buf ^ 1], bnx, bny, bnz);
 
 #ifdef AMPI_LOAD_BALANCE
-		const int steps = 5;
+		const int steps = 10;
 		if(i % steps == 0){
 			AMPI_Migrate(AMPI_INFO_LB_SYNC);
 		}
