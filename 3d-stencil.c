@@ -45,6 +45,12 @@ void create_3dstencil_dt(int bnx, int bny, int bnz, int nvar, int rank, MPI_Data
 	*backfront_ptr = backfront;
 	*eastwest_ptr = eastwest;
 	*northsouth_ptr = northsouth;
+	// int bfz, ewz, nsz;
+	// MPI_Type_size(backfront, &bfz);
+	// MPI_Type_size(eastwest, &ewz);
+	// MPI_Type_size(northsouth, &nsz);
+	// if(rank == 0)
+	// 	printf("%d %d %d\n", bfz, ewz, nsz);
 
 fn_exit:
 	return;
@@ -95,7 +101,7 @@ void parse_params(int argc, char *argv[], int rank, int nprocs, int *px, int *py
 	*lnx = ((*lx) + 1) * (*nx) / (*px) - (*lx) * (*nx) / (*px);
 	*lny = ((*ly) + 1) * (*ny) / (*py) - (*ly) * (*ny) / (*py);
 	*lnz = ((*lz) + 1) * (*nz) / (*pz) - (*lz) * (*nz) / (*pz);
-	int total_elem = (*lnx) * (*lny) * (*lnz) * (*nvar);
+	int total_elem = (*lnx + 2) * (*lny + 2) * (*lnz + 2) * (*nvar);
 	if(total_elem >= MAX_LOCAL_ELEMENTS){
 		printf("rank %d - total_elem %d is too large (>= %d)\n", rank, total_elem, MAX_LOCAL_ELEMENTS);
 		exit(1);
@@ -156,6 +162,7 @@ void init_buf(int bnx, int bny, int bnz, int nvar, int working_buf, double *dat_
 		for (j = 0; j < bny; ++j)
 			for (i = 0; i < bnx; ++i) {
 				dat_buf[working_buf][i + bnx * j + bnx * bny * k] = (double)(rand() % 10) + (double) (rand() % 10) / 100.0;
+				dat_buf[working_buf ^ 1][i + bnx * j + bnx * bny * k] = 0.0;
 			}
 
 	return;
@@ -338,6 +345,8 @@ int main(int argc, char *argv[]){
 	}
 
 	free_3dstencil_dt(backfront, eastwest, northsouth);
+	free(dat_buf[0]);
+	free(dat_buf[1]);
 	MPI_Finalize();
 	return 0;
 }	
